@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Data Search</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .upload-section {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        .file-upload {
+            border: 2px dashed #667eea;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .file-upload:hover {
+            border-color: #764ba2;
+            background-color: #f8f9ff;
+        }
+        
+        .file-upload.dragover {
+            border-color: #764ba2;
+            background-color: #f0f2ff;
+        }
+        
+        .upload-icon {
+            font-size: 3em;
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        
+        .upload-text {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+        
+        .upload-subtext {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .search-section {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            display: none;
+        }
+        
+        .search-form {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .search-input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 5px;
+            font-size: 1em;
+            min-width: 200px;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .search-select {
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 5px;
+            font-size: 1em;
+            min-width: 150px;
+        }
+        
+        .search-select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .results-section {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+            display: none;
+        }
+        
+        .results-header {
+            background: #f8f9fa;
+            padding: 20px;
+            border-bottom: 1px solid #e1e5e9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .results-info {
+            font-size: 1.1em;
+            color: #333;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e1e5e9;
+        }
+        
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        tr:hover {
+            background-color: #f8f9ff;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .alert-success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .alert-error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            padding: 20px;
+        }
+        
+        .pagination button {
+            padding: 8px 12px;
+            border: 1px solid #e1e5e9;
+            background: white;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        
+        .pagination button:hover {
+            background: #f8f9fa;
+        }
+        
+        .pagination button.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
+        @media (max-width: 768px) {
+            .search-form {
+                flex-direction: column;
+            }
+            
+            .search-input, .search-select {
+                min-width: auto;
+            }
+            
+            .results-header {
+                flex-direction: column;
+                gap: 10px;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Excel Data Search</h1>
+            <p>Upload your Excel file and search through your data easily</p>
+        </div>
+        
+        <div class="upload-section">
+            <div class="file-upload" onclick="document.getElementById('fileInput').click()">
+                <div class="upload-icon">📄</div>
+                <div class="upload-text">Click to upload or drag and drop</div>
+                <div class="upload-subtext">Supports Excel (.xlsx, .xls) and CSV files</div>
+                <input type="file" id="fileInput" class="file-input" accept=".xlsx,.xls,.csv">
+            </div>
+            {% if file_info %}
+            <div class="alert alert-success" style="margin-top: 20px;">
+                ✅ Default file loaded: <strong>{{ file_info.filename }}</strong><br>
+                📊 {{ file_info.rows }} rows, {{ file_info.columns }} columns
+            </div>
+            {% endif %}
+        </div>
+        
+        <div id="searchSection" class="search-section" {% if file_info %}style="display: block;"{% endif %}>
+            <h3>Search Your Data</h3>
+            <div class="search-form">
+                <input type="text" id="searchInput" class="search-input" placeholder="Enter your search term...">
+                <select id="columnSelect" class="search-select">
+                    <option value="all">All Columns</option>
+                    {% if file_info %}
+                        {% for column in file_info.column_names %}
+                        <option value="{{ column }}">{{ column }}</option>
+                        {% endfor %}
+                    {% endif %}
+                </select>
+                <button class="btn btn-primary" onclick="performSearch()">Search</button>
+                <button class="btn btn-secondary" onclick="showAllData()">Show All</button>
+            </div>
+        </div>
+        
+        <div id="resultsSection" class="results-section">
+            <div class="results-header">
+                <div class="results-info" id="resultsInfo"></div>
+                <button class="btn btn-secondary" onclick="exportResults()" id="exportBtn" style="display: none;">Export Results</button>
+            </div>
+            <div class="table-container">
+                <table id="resultsTable">
+                    <thead id="tableHead"></thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+            <div class="pagination" id="pagination"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentData = [];
+        let currentResults = [];
+        let currentPage = 1;
+        let totalPages = 1;
+        let itemsPerPage = 50;
+        let fileInfo = {% if file_info %}{{ file_info|tojson }}{% else %}null{% endif %};
+
+        // Auto-load data if file is already loaded
+        window.addEventListener('DOMContentLoaded', function() {
+            if (fileInfo) {
+                loadAllData();
+            }
+        });
+
+        // File upload handling
+        const fileInput = document.getElementById('fileInput');
+        const fileUpload = document.querySelector('.file-upload');
+        
+        fileInput.addEventListener('change', handleFileUpload);
+        
+        // Drag and drop functionality
+        fileUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileUpload.classList.add('dragover');
+        });
+        
+        fileUpload.addEventListener('dragleave', () => {
+            fileUpload.classList.remove('dragover');
+        });
+        
+        fileUpload.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileUpload.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                handleFileUpload();
+            }
+        });
+
+        function handleFileUpload() {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            showLoading('Uploading and processing file...');
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    fileInfo = data.data;
+                    showAlert(`File uploaded successfully! ${data.data.rows} rows, ${data.data.columns} columns`, 'success');
+                    setupSearchSection(data.data.column_names);
+                    loadAllData();
+                } else {
+                    showAlert(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                showAlert('Error uploading file: ' + error.message, 'error');
+            });
+        }
+
+        function setupSearchSection(columns) {
+            const columnSelect = document.getElementById('columnSelect');
+            columnSelect.innerHTML = '<option value="all">All Columns</option>';
+            
+            columns.forEach(column => {
+                const option = document.createElement('option');
+                option.value = column;
+                option.textContent = column;
+                columnSelect.appendChild(option);
+            });
+            
+            document.getElementById('searchSection').style.display = 'block';
+        }
+
+        function performSearch() {
+            const query = document.getElementById('searchInput').value.trim();
+            const column = document.getElementById('columnSelect').value;
+            
+            if (!query) {
+                showAlert('Please enter a search term', 'error');
+                return;
+            }
+
+            showLoading('Searching...');
+
+            fetch('/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    query: query,
+                    column: column
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    currentResults = data.results;
+                    displayResults(data.results, `Search Results: "${data.query}" in ${data.column} (${data.total_results} results)`);
+                    document.getElementById('exportBtn').style.display = data.results.length > 0 ? 'block' : 'none';
+                } else {
+                    showAlert(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                showAlert('Search error: ' + error.message, 'error');
+            });
+        }
+
+        function showAllData() {
+            document.getElementById('searchInput').value = '';
+            loadAllData();
+        }
+
+        function loadAllData(page = 1) {
+            showLoading('Loading data...');
+            
+            fetch(`/get_data?page=${page}&per_page=${itemsPerPage}`)
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.data) {
+                    currentResults = data.data;
+                    currentPage = data.page;
+                    totalPages = data.total_pages;
+                    displayResults(data.data, `All Data: ${data.filename} (${data.total_rows} total rows)`);
+                    setupPagination();
+                    document.getElementById('exportBtn').style.display = 'none';
+                } else {
+                    showAlert(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                showAlert('Error loading data: ' + error.message, 'error');
+            });
+        }
+
+        function displayResults(results, title) {
+            if (results.length === 0) {
+                document.getElementById('resultsSection').style.display = 'block';
+                document.getElementById('resultsInfo').textContent = 'No results found';
+                document.getElementById('tableHead').innerHTML = '';
+                document.getElementById('tableBody').innerHTML = '<tr><td colspan="100%" style="text-align: center; padding: 40px;">No data to display</td></tr>';
+                return;
+            }
+
+            // Create table headers
+            const headers = Object.keys(results[0]);
+            const headerRow = headers.map(header => `<th>${header}</th>`).join('');
+            document.getElementById('tableHead').innerHTML = headerRow;
+
+            // Create table rows
+            const rows = results.map(row => {
+                const cells = headers.map(header => `<td>${row[header] || ''}</td>`).join('');
+                return `<tr>${cells}</tr>`;
+            }).join('');
+            
+            document.getElementById('tableBody').innerHTML = rows;
+            document.getElementById('resultsInfo').textContent = title;
+            document.getElementById('resultsSection').style.display = 'block';
+        }
+
+        function setupPagination() {
+            const pagination = document.getElementById('pagination');
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+
+            let paginationHTML = '';
+            
+            // Previous button
+            if (currentPage > 1) {
+                paginationHTML += `<button onclick="loadAllData(${currentPage - 1})">Previous</button>`;
+            }
+            
+            // Page numbers
+            for (let i = Math.max(1, currentPage - 2); i <= Math.min(totalPages, currentPage + 2); i++) {
+                const activeClass = i === currentPage ? 'active' : '';
+                paginationHTML += `<button class="${activeClass}" onclick="loadAllData(${i})">${i}</button>`;
+            }
+            
+            // Next button
+            if (currentPage < totalPages) {
+                paginationHTML += `<button onclick="loadAllData(${currentPage + 1})">Next</button>`;
+            }
+            
+            pagination.innerHTML = paginationHTML;
+        }
+
+        function exportResults() {
+            if (currentResults.length === 0) {
+                showAlert('No results to export', 'error');
+                return;
+            }
+
+            showLoading('Exporting results...');
+
+            fetch('/export', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    results: currentResults
+                })
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.blob();
+                }
+                throw new Error('Export failed');
+            })
+            .then(blob => {
+                hideLoading();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = 'search_results.xlsx';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                showAlert('Results exported successfully!', 'success');
+            })
+            .catch(error => {
+                hideLoading();
+                showAlert('Export error: ' + error.message, 'error');
+            });
+        }
+
+        function showLoading(message) {
+            const resultsSection = document.getElementById('resultsSection');
+            resultsSection.style.display = 'block';
+            resultsSection.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <div>${message}</div>
+                </div>
+            `;
+        }
+
+        function hideLoading() {
+            const resultsSection = document.getElementById('resultsSection');
+            resultsSection.innerHTML = `
+                <div class="results-header">
+                    <div class="results-info" id="resultsInfo"></div>
+                    <button class="btn btn-secondary" onclick="exportResults()" id="exportBtn" style="display: none;">Export Results</button>
+                </div>
+                <div class="table-container">
+                    <table id="resultsTable">
+                        <thead id="tableHead"></thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+                <div class="pagination" id="pagination"></div>
+            `;
+        }
+
+        function showAlert(message, type) {
+            const existingAlert = document.querySelector('.alert');
+            if (existingAlert) {
+                existingAlert.remove();
+            }
+
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            
+            const container = document.querySelector('.container');
+            container.insertBefore(alert, container.children[1]);
+            
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        // Enter key search
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+    </script>
+</body>
+</html>
