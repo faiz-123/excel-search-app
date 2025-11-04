@@ -5,12 +5,13 @@ from werkzeug.utils import secure_filename
 import json
 import logging
 import sys
+import traceback
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates', static_folder='static')
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
@@ -18,12 +19,14 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 @app.errorhandler(500)
 def internal_error(error):
     logger.error(f"Internal server error: {error}")
-    return jsonify({'error': 'Internal server error occurred'}), 500
+    logger.error(f"Traceback: {traceback.format_exc()}")
+    return jsonify({'error': 'Internal server error occurred', 'details': str(error)}), 500
 
 @app.errorhandler(Exception)
 def handle_exception(e):
     logger.error(f"Unhandled exception: {e}")
-    return jsonify({'error': f'Application error: {str(e)}'}), 500
+    logger.error(f"Traceback: {traceback.format_exc()}")
+    return jsonify({'error': f'Application error: {str(e)}', 'type': type(e).__name__}), 500
 
 # Global variable to store the current dataframe
 current_df = None
@@ -87,13 +90,25 @@ try:
     logger.info("🚀 Starting application...")
     logger.info(f"📁 Current working directory: {os.getcwd()}")
     logger.info(f"📂 Files in current directory: {os.listdir('.')}")
-    load_default_file()
+    if current_df is None:  # Only load if not already loaded
+        load_default_file()
 except Exception as e:
     logger.error(f"❌ Error during startup: {e}")
     # Don't fail completely, allow app to start without data
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/test')
+def test():
+    """Simple test endpoint"""
+    return jsonify({
+        'message': 'App is working!',
+        'cwd': os.getcwd(),
+        'files': os.listdir('.'),
+        'templates_dir_exists': os.path.exists('templates'),
+        'index_html_exists': os.path.exists('templates/index.html')
+    })
 
 @app.route('/health')
 def health_check():
@@ -104,11 +119,19 @@ def health_check():
         'status': 'healthy',
         'current_directory': os.getcwd(),
         'files_in_directory': os.listdir('.'),
+        'templates_exist': os.path.exists('templates'),
+        'index_html_exists': os.path.exists('templates/index.html'),
+        'template_folder': app.template_folder,
+        'static_folder': app.static_folder,
         'data_loaded': current_df is not None,
         'filename': current_filename,
         'python_version': sys.version,
         'pandas_version': pd.__version__
     }
+    
+    # Check templates directory
+    if os.path.exists('templates'):
+        status['template_files'] = os.listdir('templates')
     
     if current_df is not None:
         status['data_shape'] = current_df.shape
@@ -120,19 +143,14 @@ def health_check():
 def index():
     global current_df, current_filename
     
-    # Get file info if data is already loaded
-    file_info = None
-    if current_df is not None:
-        file_info = {
-            'filename': current_filename,
-            'rows': len(current_df),
-            'columns': len(current_df.columns),
-            'column_names': current_df.columns.tolist()
-        }
-    else:
-        # Try to load the file if not already loaded
-        print("🔄 Data not loaded, attempting to load...")
-        load_default_file()
+    try:
+        logger.info("🏠 Accessing home page...")
+        logger.info(f"📁 Current directory: {os.getcwd()}")
+        logger.info(f"📂 Template folder: {app.template_folder}")
+        logger.info(f"📄 Index.html exists: {os.path.exists('templates/index.html')}")
+        
+        # Get file info if data is already loaded
+        file_info = None
         if current_df is not None:
             file_info = {
                 'filename': current_filename,
@@ -140,8 +158,42 @@ def index():
                 'columns': len(current_df.columns),
                 'column_names': current_df.columns.tolist()
             }
+            logger.info(f"📊 Data info: {file_info['filename']} with {file_info['rows']} rows")
+        else:
+            # Try to load the file if not already loaded
+            logger.info("🔄 Data not loaded, attempting to load...")
+            load_default_file()
+            if current_df is not None:
+                file_info = {
+                    'filename': current_filename,
+                    'rows': len(current_df),
+                    'columns': len(current_df.columns),
+                    'column_names': current_df.columns.tolist()
+                }
+        
+        logger.info("🎯 Rendering template...")
+        return render_template('index.html', file_info=file_info)
     
-    return render_template('index.html', file_info=file_info)
+    except Exception as e:
+        logger.error(f"❌ Error in index route: {e}")
+        logger.error(f"📍 Traceback: {traceback.format_exc()}")
+        
+        # Return a simple HTML response if template fails
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head><title>Excel Search - Error</title></head>
+        <body>
+            <h1>Excel Search Application</h1>
+            <p>Template loading error: {str(e)}</p>
+            <p>Current directory: {os.getcwd()}</p>
+            <p>Template folder: {app.template_folder}</p>
+            <p>Files: {os.listdir('.')}</p>
+            <a href="/health">Check Health Status</a>
+        </body>
+        </html>
+        """
+        return html_content, 500
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
