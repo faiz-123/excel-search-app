@@ -3,10 +3,27 @@ import pandas as pd
 import os
 from werkzeug.utils import secure_filename
 import json
+import logging
+import sys
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+
+# Add error handler
+@app.errorhandler(500)
+def internal_error(error):
+    logger.error(f"Internal server error: {error}")
+    return jsonify({'error': 'Internal server error occurred'}), 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    logger.error(f"Unhandled exception: {e}")
+    return jsonify({'error': f'Application error: {str(e)}'}), 500
 
 # Global variable to store the current dataframe
 current_df = None
@@ -19,38 +36,85 @@ def load_default_file():
     """Load the default Excel file on startup"""
     global current_df, current_filename
     
-    default_file_path = 'nadiad_All_part_merged-filterd.xlsx'
-    
-    # Try to load from root directory first, then uploads folder
-    file_paths = [
-        default_file_path,
-        os.path.join('uploads', default_file_path)
+    # Try different files in order of preference
+    file_options = [
+        'nadiad_All_part_merged-filterd.xlsx',  # Full file
+        'nadiad_sample.xlsx',  # Sample file
+        os.path.join('uploads', 'nadiad_All_part_merged-filterd.xlsx'),
+        os.path.join('uploads', 'nadiad_sample.xlsx')
     ]
     
-    for filepath in file_paths:
+    for filepath in file_options:
         if os.path.exists(filepath):
             try:
                 print(f"🔄 Loading Excel file: {filepath}")
-                current_df = pd.read_excel(filepath)
+                file_size_mb = os.path.getsize(filepath) / 1024 / 1024
+                print(f"📁 File size: {file_size_mb:.2f} MB")
+                
+                # Load with memory optimization
+                current_df = pd.read_excel(filepath, engine='openpyxl')
+                
                 # Clean the data - fill NaN values and ensure proper data types
                 current_df = current_df.fillna('')
-                current_df = current_df.astype(str)
-                current_filename = default_file_path
-                print(f"✅ Successfully loaded default file: {filepath}")
+                
+                # Convert to string but handle memory efficiently
+                for col in current_df.columns:
+                    current_df[col] = current_df[col].astype(str)
+                
+                current_filename = os.path.basename(filepath)
+                print(f"✅ Successfully loaded file: {filepath}")
                 print(f"📊 Data shape: {current_df.shape[0]} rows, {current_df.shape[1]} columns")
+                
+                memory_usage_mb = current_df.memory_usage(deep=True).sum() / 1024 / 1024
+                print(f"🧠 Memory usage: {memory_usage_mb:.2f} MB")
+                
                 return True
+                
+            except MemoryError as e:
+                print(f"💾 Memory error loading {filepath}: {e}")
+                print("⚠️ File too large for available memory, trying next option...")
+                continue
             except Exception as e:
                 print(f"❌ Error loading {filepath}: {e}")
                 continue
     
-    print(f"⚠️ Default file '{default_file_path}' not found in root or uploads folder")
+    print(f"⚠️ No Excel files could be loaded")
+    print(f"📁 Current directory files: {[f for f in os.listdir('.') if f.endswith(('.xlsx', '.xls', '.csv'))]}")
     return False
 
 # Load data immediately when module is imported (for gunicorn)
-load_default_file()
+try:
+    logger.info("🚀 Starting application...")
+    logger.info(f"📁 Current working directory: {os.getcwd()}")
+    logger.info(f"📂 Files in current directory: {os.listdir('.')}")
+    load_default_file()
+except Exception as e:
+    logger.error(f"❌ Error during startup: {e}")
+    # Don't fail completely, allow app to start without data
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/health')
+def health_check():
+    """Health check endpoint for deployment debugging"""
+    global current_df, current_filename
+    
+    status = {
+        'status': 'healthy',
+        'current_directory': os.getcwd(),
+        'files_in_directory': os.listdir('.'),
+        'data_loaded': current_df is not None,
+        'filename': current_filename,
+        'python_version': sys.version,
+        'pandas_version': pd.__version__
+    }
+    
+    if current_df is not None:
+        status['data_shape'] = current_df.shape
+        status['columns'] = current_df.columns.tolist()
+    
+    return jsonify(status)
 
 @app.route('/')
 def index():
@@ -65,6 +129,17 @@ def index():
             'columns': len(current_df.columns),
             'column_names': current_df.columns.tolist()
         }
+    else:
+        # Try to load the file if not already loaded
+        print("🔄 Data not loaded, attempting to load...")
+        load_default_file()
+        if current_df is not None:
+            file_info = {
+                'filename': current_filename,
+                'rows': len(current_df),
+                'columns': len(current_df.columns),
+                'column_names': current_df.columns.tolist()
+            }
     
     return render_template('index.html', file_info=file_info)
 
@@ -168,30 +243,38 @@ def get_data():
     global current_df, current_filename
     
     if current_df is None:
-        return jsonify({'error': 'No file uploaded'}), 400
+        # Try to load the file if not loaded
+        load_default_file()
+        if current_df is None:
+            return jsonify({'error': 'No file loaded and unable to load default file'}), 400
     
-    # Get pagination parameters
-    page = int(request.args.get('page', 1))
-    per_page = int(request.args.get('per_page', 50))
+    try:
+        # Get pagination parameters
+        page = int(request.args.get('page', 1))
+        per_page = min(int(request.args.get('per_page', 50)), 100)  # Limit to 100 per page
+        
+        # Calculate pagination
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        
+        # Get page data
+        page_data_df = current_df.iloc[start_idx:end_idx].copy()
+        page_data_df = page_data_df.fillna('')
+        page_data = page_data_df.to_dict('records')
+        
+        return jsonify({
+            'data': page_data,
+            'total_rows': len(current_df),
+            'page': page,
+            'per_page': per_page,
+            'total_pages': (len(current_df) + per_page - 1) // per_page,
+            'columns': current_df.columns.tolist(),
+            'filename': current_filename
+        })
     
-    # Calculate pagination
-    start_idx = (page - 1) * per_page
-    end_idx = start_idx + per_page
-    
-    # Get page data
-    page_data_df = current_df.iloc[start_idx:end_idx]
-    page_data_df = page_data_df.fillna('')
-    page_data = page_data_df.to_dict('records')
-    
-    return jsonify({
-        'data': page_data,
-        'total_rows': len(current_df),
-        'page': page,
-        'per_page': per_page,
-        'total_pages': (len(current_df) + per_page - 1) // per_page,
-        'columns': current_df.columns.tolist(),
-        'filename': current_filename
-    })
+    except Exception as e:
+        print(f"❌ Error in get_data: {e}")
+        return jsonify({'error': f'Error retrieving data: {str(e)}'}), 500
 
 @app.route('/export', methods=['POST'])
 def export_results():
