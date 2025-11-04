@@ -30,6 +30,7 @@ def load_default_file():
     for filepath in file_paths:
         if os.path.exists(filepath):
             try:
+                print(f"🔄 Loading Excel file: {filepath}")
                 current_df = pd.read_excel(filepath)
                 # Clean the data - fill NaN values and ensure proper data types
                 current_df = current_df.fillna('')
@@ -44,6 +45,9 @@ def load_default_file():
     
     print(f"⚠️ Default file '{default_file_path}' not found in root or uploads folder")
     return False
+
+# Load data immediately when module is imported (for gunicorn)
+load_default_file()
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
