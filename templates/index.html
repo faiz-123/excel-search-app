@@ -88,77 +88,6 @@
             }
         }
         
-        .upload-section {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 30px;
-        }
-        
-        .upload-section.compact {
-            padding: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .file-upload {
-            border: 2px dashed #667eea;
-            border-radius: 10px;
-            padding: 40px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .file-upload.compact {
-            padding: 20px;
-            border: 1px dashed #ccc;
-        }
-        
-        .file-upload:hover {
-            border-color: #764ba2;
-            background-color: #f8f9ff;
-        }
-        
-        .file-upload.dragover {
-            border-color: #764ba2;
-            background-color: #f0f2ff;
-        }
-        
-        .upload-icon {
-            font-size: 3em;
-            color: #667eea;
-            margin-bottom: 15px;
-        }
-        
-        .upload-icon.compact {
-            font-size: 1.5em;
-            margin-bottom: 8px;
-        }
-        
-        .upload-text {
-            font-size: 1.2em;
-            margin-bottom: 10px;
-        }
-        
-        .upload-text.compact {
-            font-size: 0.9em;
-            margin-bottom: 5px;
-        }
-        
-        .upload-subtext {
-            color: #666;
-            font-size: 0.9em;
-        }
-        
-        .upload-subtext.compact {
-            font-size: 0.8em;
-        }
-        
-        .file-input {
-            display: none;
-        }
-        
         .btn {
             padding: 12px 25px;
             border: none;
@@ -372,6 +301,16 @@
                 font-size: 16px; /* Prevents zoom on iOS */
             }
             
+            .language-search-section {
+                padding: 15px !important;
+                margin-bottom: 20px !important;
+            }
+            
+            .language-search-section h4,
+            .regular-search-section h4 {
+                font-size: 1em !important;
+            }
+            
             .btn {
                 padding: 15px 25px;
                 font-size: 1.1em;
@@ -390,10 +329,6 @@
             }
             
             .search-section {
-                padding: 20px;
-            }
-            
-            .upload-section {
                 padding: 20px;
             }
             
@@ -449,8 +384,10 @@
         
         <div id="searchSection" class="search-section" {% if file_info %}style="display: block;"{% endif %}>
             <h3>Search Your Data</h3>
+            
+            <!-- Search Section -->
             <div class="search-form">
-                <input type="text" id="searchInput" class="search-input" placeholder="Enter your search term...">
+                <input type="text" id="searchInput" class="search-input" placeholder="ગુજરાતી મા લખવુ...">
                 <select id="columnSelect" class="search-select">
                     <option value="all">All Columns</option>
                     {% if file_info %}
@@ -477,15 +414,6 @@
             </div>
             <div class="pagination" id="pagination"></div>
         </div>
-        
-        <div class="upload-section{% if file_info %} compact{% endif %}">
-            <div class="file-upload{% if file_info %} compact{% endif %}" onclick="document.getElementById('fileInput').click()">
-                <div class="upload-icon{% if file_info %} compact{% endif %}">📄</div>
-                <div class="upload-text{% if file_info %} compact{% endif %}">Click to upload or drag and drop</div>
-                <div class="upload-subtext{% if file_info %} compact{% endif %}">Supports Excel (.xlsx, .xls) and CSV files</div>
-                <input type="file" id="fileInput" class="file-input" accept=".xlsx,.xls,.csv">
-            </div>
-        </div>
     </div>
 
     <script>
@@ -498,65 +426,47 @@
 
         // Auto-load data if file is already loaded
         window.addEventListener('DOMContentLoaded', function() {
+            console.log('🌐 DOM loaded, fileInfo:', fileInfo);
+            // Auto-load data if file is already loaded
             if (fileInfo) {
+                console.log('📊 Auto-loading data for file:', fileInfo.filename);
                 loadAllData();
+            } else {
+                console.log('⚠️ No fileInfo available, skipping auto-load');
             }
         });
 
-        // File upload handling
-        const fileInput = document.getElementById('fileInput');
-        const fileUpload = document.querySelector('.file-upload');
-        
-        fileInput.addEventListener('change', handleFileUpload);
-        
-        // Drag and drop functionality
-        fileUpload.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            fileUpload.classList.add('dragover');
-        });
-        
-        fileUpload.addEventListener('dragleave', () => {
-            fileUpload.classList.remove('dragover');
-        });
-        
-        fileUpload.addEventListener('drop', (e) => {
-            e.preventDefault();
-            fileUpload.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                fileInput.files = files;
-                handleFileUpload();
-            }
-        });
-
-        function handleFileUpload() {
-            const file = fileInput.files[0];
-            if (!file) return;
-
-            const formData = new FormData();
-            formData.append('file', file);
-
-            showLoading('Uploading and processing file...');
-
-            fetch('/upload', {
+        // Modified search function to accept custom search term
+        function performSearchWithTerm(searchTerm, column = null) {
+            const selectedColumn = column || document.getElementById('columnSelect').value;
+            
+            showLoading('Searching...');
+            
+            fetch('/search', {
                 method: 'POST',
-                body: formData
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    query: searchTerm,
+                    column: selectedColumn
+                })
             })
             .then(response => response.json())
             .then(data => {
                 hideLoading();
                 if (data.success) {
-                    fileInfo = data.data;
-                    showAlert(`File uploaded successfully! ${data.data.rows} rows, ${data.data.columns} columns`, 'success');
-                    setupSearchSection(data.data.column_names);
-                    loadAllData();
+                    currentResults = data.results;
+                    currentPage = 1;
+                    displayResults(data.results, `Search Results: "${searchTerm}" (${data.total_results} results)`);
+                    document.getElementById('resultsSection').style.display = 'block';
                 } else {
                     showAlert(data.error, 'error');
                 }
             })
             .catch(error => {
                 hideLoading();
-                showAlert('Error uploading file: ' + error.message, 'error');
+                showAlert('Search error: ' + error.message, 'error');
             });
         }
 
@@ -642,6 +552,16 @@
         }
 
         function displayResults(results, title) {
+            // Validate parameters
+            if (!results || !Array.isArray(results)) {
+                console.error('displayResults called with invalid results:', results);
+                document.getElementById('resultsSection').style.display = 'block';
+                document.getElementById('resultsInfo').textContent = 'Error displaying results';
+                document.getElementById('tableHead').innerHTML = '';
+                document.getElementById('tableBody').innerHTML = '<tr><td colspan="100%" style="text-align: center; padding: 40px;">Error: Invalid data received</td></tr>';
+                return;
+            }
+            
             if (results.length === 0) {
                 document.getElementById('resultsSection').style.display = 'block';
                 document.getElementById('resultsInfo').textContent = 'No results found';
@@ -782,6 +702,13 @@
         }
 
         // Enter key search
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+        
+        // Enter key search for main search input
         document.getElementById('searchInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 performSearch();
