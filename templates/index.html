@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Excel Data Search</title>
+    <title>Rise Up Group - Excel Data Search</title>
     <style>
         * {
             margin: 0;
@@ -29,17 +29,63 @@
             padding: 30px;
             border-radius: 10px;
             margin-bottom: 30px;
-            text-align: center;
         }
         
-        .header h1 {
-            font-size: 2.5em;
+        .header-content {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+        }
+        
+        .logo-container {
+            flex-shrink: 0;
+        }
+        
+        .logo {
+            width: 120px;
+            height: 120px;
+            object-fit: contain;
+            border-radius: 15px;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+        }
+        
+        .text-content {
+            flex: 1;
+        }
+        
+        .text-content h1 {
+            font-size: 2.8em;
             margin-bottom: 10px;
+            margin-top: 0;
         }
         
-        .header p {
-            font-size: 1.1em;
+        .text-content p {
+            font-size: 1.2em;
             opacity: 0.9;
+            margin-bottom: 15px;
+        }
+        
+        .developer-info {
+            font-size: 1em;
+            opacity: 0.8;
+            font-style: italic;
+        }
+        
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                text-align: center;
+                gap: 20px;
+            }
+            
+            .logo {
+                width: 100px;
+                height: 100px;
+            }
+            
+            .text-content h1 {
+                font-size: 2.2em;
+            }
         }
         
         .upload-section {
@@ -50,6 +96,11 @@
             margin-bottom: 30px;
         }
         
+        .upload-section.compact {
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
         .file-upload {
             border: 2px dashed #667eea;
             border-radius: 10px;
@@ -57,6 +108,11 @@
             text-align: center;
             cursor: pointer;
             transition: all 0.3s ease;
+        }
+        
+        .file-upload.compact {
+            padding: 20px;
+            border: 1px dashed #ccc;
         }
         
         .file-upload:hover {
@@ -75,14 +131,28 @@
             margin-bottom: 15px;
         }
         
+        .upload-icon.compact {
+            font-size: 1.5em;
+            margin-bottom: 8px;
+        }
+        
         .upload-text {
             font-size: 1.2em;
             margin-bottom: 10px;
         }
         
+        .upload-text.compact {
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+        
         .upload-subtext {
             color: #666;
             font-size: 0.9em;
+        }
+        
+        .upload-subtext.compact {
+            font-size: 0.8em;
         }
         
         .file-input {
@@ -246,6 +316,12 @@
             color: #155724;
         }
         
+        .alert-info {
+            background-color: #e3f2fd;
+            border: 1px solid #90caf9;
+            color: #1976d2;
+        }
+        
         .alert-error {
             background-color: #f8d7da;
             border: 1px solid #f5c6cb;
@@ -297,23 +373,30 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>📊 Excel Data Search</h1>
-            <p>Upload your Excel file and search through your data easily</p>
+            <div class="header-content">
+                <div class="logo-container">
+                    <img src="/static/logo.jpeg" alt="Rise Up Group Logo" class="logo">
+                </div>
+                <div class="text-content">
+                    <h1>Rise Up Group</h1>
+                    <p>Search through your Excel data easily and efficiently</p>
+                    <div class="developer-info">
+                        <small>Developed by: Faiz Babuna</small><br>
+                        <small>Tech Team: Safwan Chaklasiya, M.Shoaib Shabhai</small>
+                    </div>
+                </div>
+            </div>
         </div>
         
-        <div class="upload-section">
-            <div class="file-upload" onclick="document.getElementById('fileInput').click()">
-                <div class="upload-icon">📄</div>
-                <div class="upload-text">Click to upload or drag and drop</div>
-                <div class="upload-subtext">Supports Excel (.xlsx, .xls) and CSV files</div>
-                <input type="file" id="fileInput" class="file-input" accept=".xlsx,.xls,.csv">
-            </div>
-            {% if file_info %}
-            <div class="alert alert-success" style="margin-top: 20px;">
-                ✅ Default file loaded: <strong>{{ file_info.filename }}</strong><br>
-                📊 {{ file_info.rows }} rows, {{ file_info.columns }} columns
-            </div>
-            {% endif %}
+        {% if file_info %}
+        <div class="alert alert-success" style="margin-bottom: 20px;">
+            ✅ Default file loaded: <strong>{{ file_info.filename }}</strong><br>
+            📊 {{ file_info.rows }} rows, {{ file_info.columns }} columns
+        </div>
+        {% endif %}
+        
+        <div class="alert alert-info">
+            <strong>Disclaimer:</strong> This tool is for ease of finding your details. For confirmation official website shall be referred.
         </div>
         
         <div id="searchSection" class="search-section" {% if file_info %}style="display: block;"{% endif %}>
@@ -345,6 +428,15 @@
                 </table>
             </div>
             <div class="pagination" id="pagination"></div>
+        </div>
+        
+        <div class="upload-section{% if file_info %} compact{% endif %}">
+            <div class="file-upload{% if file_info %} compact{% endif %}" onclick="document.getElementById('fileInput').click()">
+                <div class="upload-icon{% if file_info %} compact{% endif %}">📄</div>
+                <div class="upload-text{% if file_info %} compact{% endif %}">Click to upload or drag and drop</div>
+                <div class="upload-subtext{% if file_info %} compact{% endif %}">Supports Excel (.xlsx, .xls) and CSV files</div>
+                <input type="file" id="fileInput" class="file-input" accept=".xlsx,.xls,.csv">
+            </div>
         </div>
     </div>
 
